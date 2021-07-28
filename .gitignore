@@ -1,5 +1,5 @@
 .env
-payment.js
+globalpayments/payment.js
 package-lock.json
 globalpayments-3ds.js
 /node_modules
