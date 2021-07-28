@@ -1,0 +1,243 @@
+<html>
+
+<head>
+    <script src="https://js.globalpay.com/v1/globalpayments.js"></script>
+    <script src="globalpayments-3ds.js"></script>
+</head>
+
+<body>
+    <p>4012001038488884</p>
+
+    <form id="payment-form" action="/api/charge" method="post">
+        <!-- Other input fields to capture relevant data -->
+      
+      
+        <!-- Targets for the credit card form's fields -->
+       
+        <label for="credit-card-card-number">Card number</label>
+        <div id="credit-card-card-number"></div>
+        <label for="credit-card-card-holder">Cardholder Name</label>
+        <div id="credit-card-card-holder"></div>
+        <label for="credit-card-card-cvv">Security Code (last 3 digits)</label>
+        <div id="credit-card-card-cvv"></div>
+
+        <div id="credit-card-card-expiration"></div>
+        <label for="cardholder-exp-month">Expiry Date</label>
+        <select id="cardholder-exp-month">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+            <option>9</option>
+            <option>10</option>
+            <option>11</option>
+            <option>12</option>
+        </select>
+    
+        <select id="cardholder-exp-year">
+            <option>2021</option>
+            <option>2022</option>
+            <option>2023</option>
+            <option>2024</option>
+            <option>2025</option>
+            <option>2026</option>
+            <option>2027</option>
+            <option>2028</option>
+            <option>2029</option>
+            <option>2030</option>
+        </select>
+
+        <div id="credit-card-submit"></div>
+      </form>
+
+    <script type="text/javascript">
+
+ 
+        // use ngrok to tunnel into a publicly accessable website
+        const ngrok = "https://4d0c91ba9ded.ngrok.io"
+
+        const getAccessToken = async () => {
+            const response = await fetch ("api/accessToken")
+            const json = await response.json()
+            return json
+        }
+
+        const startPayment = async() => {
+
+            let accessToken = await getAccessToken()
+            console.log(accessToken)
+            
+        // Configure account
+        GlobalPayments.configure({
+            accessToken: accessToken.token,
+            env: "sandbox" // or "production"
+        });       
+        
+        // Create Form
+
+        const cardForm = GlobalPayments.ui.form({
+                fields: {
+                    "card-holder-name": {
+                    placeholder: "Jane Smith",
+                    target: "#credit-card-card-holder"
+                    },
+                    "card-number": {
+                    placeholder: "4242 4242 4242 4242",
+                    target: "#credit-card-card-number"
+                    },
+                    "card-expiration": {
+                    placeholder: "MM / YYYY",
+                    target: "#credit-card-card-expiration"
+                    },
+                    "card-cvv": {
+                    placeholder: "321",
+                    target: "#credit-card-card-cvv"
+                    },
+                    "submit": {
+                    target: "#credit-card-submit",
+                    value: "Submit",
+                    }
+                },
+                styles: {
+
+                    "body":{
+                        "font-family":"sans-serif"
+                    },
+
+                    ".form-row":{
+                        "margin-top":"10px"
+                    }
+                    // Your styles
+                }
+                });
+
+
+            // new variable which contains the final value
+            var cardExpiryDateField;
+
+            // drop down variable that you create
+            // format is : "MM / YYYY"	
+            var dropDownExpirationDate = "07 / 2023"
+            var dropdown = ["07", "2023"]
+            
+
+            cardForm.ready(function(fields) {
+              
+                // this is a new line to get a reference to the credit-card-card-expiration iframe once the form is ready
+                cardExpiryDateField = fields['card-expiration'];
+                document.getElementById("credit-card-card-expiration").style.display = 'none';
+
+                // Add a listener to input for the dropdown menu
+                document.getElementById("cardholder-exp-month").addEventListener("input", (e) => {
+            
+                    dropdown[0]= e.currentTarget.value
+                    dropDownExpirationDate = dropdown[0] + " / " + dropdown[1]
+                    
+                    console.log(dropDownExpirationDate)
+                    cardExpiryDateField.setValue(dropDownExpirationDate);
+
+                    if (!cardExpiryDateField) {
+                    return;
+                    }
+                })
+
+                document.getElementById("cardholder-exp-year").addEventListener("input", (e) => {
+                
+                    dropdown[1] = e.currentTarget.value
+                
+                    dropDownExpirationDate = dropdown[0] + " / " + dropdown[1]
+                    
+                    console.log(dropDownExpirationDate)
+                    cardExpiryDateField.setValue(dropDownExpirationDate);
+
+                    if (!cardExpiryDateField) {
+                    return;
+                    }
+
+                });
+            });
+
+     
+
+        
+        cardForm.on("token-success", async (resp) => { // need to make this function async to allow the helper library to use await
+
+        console.log("Response", resp)
+
+        // Start 3DSecure process
+
+            const {
+                checkVersion,
+                getBrowserData,
+                initiateAuthentication,
+                AuthenticationSource,
+                AuthenticationRequestType,
+                MessageCategory,
+                ChallengeRequestIndicator,
+                ChallengeWindowSize,
+            } = GlobalPayments.ThreeDSecure;
+
+        console.log("Method Notifcation URL", ngrok + '/3ds2/methodNotificationUrl')
+        console.log("Challenge Notifcation URL",ngrok + '/3ds2/challengeNotificationUrl')
+
+            try {
+                const versionCheckData = await checkVersion('/3ds2/check3dsVersion', {
+                    methodNotificationUrl: ngrok + '/3ds2/methodNotificationUrl', // added ngrok variable
+                    challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
+                    paymentToken: resp.paymentReference,
+              });
+
+        console.log("Version Check Data", versionCheckData)
+
+                const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
+                    merchantContactUrl: 'http://example.com/contact',
+                    challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
+                    challengeWindow: {
+                        windowSize: ChallengeWindowSize.Windowed600x400,
+                        displayMode: 'lightbox',
+                    },
+                    authenticationRequestType: AuthenticationRequestType.PaymentTransaction,
+                    serverTransactionId: versionCheckData.serverTransactionId,
+                    methodUrlComplete: true,
+                    paymentToken: resp.paymentReference,
+                    id: versionCheckData.id
+                });
+
+        console.log("Authentication Data", authenticateData)
+
+            } catch (e) {
+            console.error('An error occurred', e.reasons);
+            console.log(e)
+            return;
+        }     
+
+        console.log("Single use Token", resp.paymentReference)
+        // // add payment token to form as a hidden input
+            // const token = document.createElement("input");
+            // token.type = "hidden";
+            // token.name = "payment_token";
+            // token.value = resp.paymentReference;
+        
+        // // Submit data to the integration's backend for processing
+            // const form = document.getElementById("payment-form");
+            // form.appendChild(token);
+            // form.submit();
+        });
+        
+        cardForm.on("token-error", (resp) => {
+            // show error to the consumer
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", async function(){
+        console.log("Starting payment")
+        await startPayment();
+    });
+        </script>
+
+</body>
+</html>

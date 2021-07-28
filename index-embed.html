@@ -1,0 +1,132 @@
+<html>
+
+<head>
+    <script src="https://js.globalpay.com/v1/globalpayments.js"></script>
+    <script src="globalpayments-3ds.js"></script>
+</head>
+
+<body>
+    <p>4012001038488884</p>
+
+    <form id="payment-form" action="/api/charge" method="post">
+        <!-- Other input fields to capture relevant data -->
+        <label for="billing_zip">Billing Zip Code</label>
+        <input id="billing_zip" name="billing_zip" value="47150" type="tel" />
+    
+        <!-- Target for the credit card form -->
+        <div id="credit-card"></div>
+    </form>
+
+    <div id="acsiFrame"></div>
+
+    <script type="text/javascript">
+
+        // use ngrok to tunnel into a publicly accessable website
+        const ngrok = "https://c38ec6392747.ngrok.io"
+
+        // Get Access Token
+        const getAccessToken = async () => {
+            const response = await fetch ("api/accessToken")
+            const json = await response.json()
+            return json
+        }
+
+        // Create function to start the payment process
+        const startPayment = async() => {
+
+            let accessToken = await getAccessToken()
+            console.log(accessToken)
+            
+        // Configure account
+        GlobalPayments.configure({
+            accessToken: accessToken.token,
+            env: "sandbox" // or "production"
+        });       
+        
+        // Create Form
+        const cardForm = GlobalPayments.creditCard.form("#credit-card", { style: "gp-default" });
+        
+        cardForm.on("token-success", async (resp) => { // need to make this function async to allow the helper library to use await
+
+        console.log("Response", resp)
+
+        // Start 3DSecure process
+
+            const {
+                checkVersion,
+                getBrowserData,
+                initiateAuthentication,
+                AuthenticationSource,
+                AuthenticationRequestType,
+                MessageCategory,
+                ChallengeRequestIndicator,
+                ChallengeWindowSize,
+            } = GlobalPayments.ThreeDSecure;
+
+        console.log("Method Notifcation URL", ngrok + '/3ds2/methodNotificationUrl')
+        console.log("Challenge Notifcation URL",ngrok + '/3ds2/challengeNotificationUrl')
+
+            try {
+                const versionCheckData = await checkVersion('/3ds2/check3dsVersion', {
+                    methodNotificationUrl: ngrok + '/3ds2/methodNotificationUrl', // using ngrok + route for methodNotificationUrl
+                    challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
+                    paymentToken: resp.paymentReference,
+              });
+
+
+        // initiate a redirect with VersionCheckData + Token
+        // initiate the below in new page
+        console.log("Version Check Data", versionCheckData)
+
+                const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
+                    merchantContactUrl: 'http://example.com/contact',
+                    challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
+                    challengeWindow: {
+                        windowSize: ChallengeWindowSize.FullScreen,
+                        displayMode: 'embedded',
+                        target: "#acsiFrame" 
+                        
+                        // Query selector within a String
+                        // Or an actual DOM element e.g <div> id
+                    },
+                    authenticationRequestType: AuthenticationRequestType.PaymentTransaction,
+                    serverTransactionId: versionCheckData.serverTransactionId,
+                    methodUrlComplete: true,
+                    paymentToken: resp.paymentReference,
+                    id: versionCheckData.id
+                });
+
+        console.log("Authentication Data", authenticateData)
+
+            } catch (e) {
+            console.error('An error occurred', e.reasons);
+            console.log(e)
+            return;
+        }     
+
+        console.log("Single use Token", resp.paymentReference)
+        // // add payment token to form as a hidden input
+            // const token = document.createElement("input");
+            // token.type = "hidden";
+            // token.name = "payment_token";
+            // token.value = resp.paymentReference;
+        
+        // // Submit data to the integration's backend for processing
+            // const form = document.getElementById("payment-form");
+            // form.appendChild(token);
+            // form.submit();
+        });
+        
+        cardForm.on("token-error", (resp) => {
+            // show error to the consumer
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", async function(){
+        console.log("Starting payment")
+        await startPayment();
+    });
+        </script>
+
+</body>
+</html>

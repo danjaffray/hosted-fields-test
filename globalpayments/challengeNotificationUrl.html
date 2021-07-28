@@ -1,0 +1,13 @@
+<script src="/globalpayments-3ds.js"></script>
+<script>
+
+// Get the paramaters from the query string in the URL
+const urlSearchParams = new URLSearchParams(window.location.search);
+const params = Object.fromEntries(urlSearchParams.entries());
+
+console.log(params)
+
+// Send data back to the Global Payments JS library
+// Whatever you put in here will be returned in authenticationData.challenge.response.data
+GlobalPayments.ThreeDSecure.handleChallengeNotification(params);
+</script>
