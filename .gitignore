@@ -1,0 +1,5 @@
+.env
+payment.js
+package-lock.json
+globalpayments-3ds.js
+/node_modules
