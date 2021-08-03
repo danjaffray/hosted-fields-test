@@ -1,0 +1,29 @@
+{
+  "name": "hosted-fields-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "globalpayments-api": "^1.4.5",
+    "js-sha512": "^0.8.0",
+    "node-fetch": "^2.6.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danjaffray/hosted-fields-test.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/danjaffray/hosted-fields-test/issues"
+  },
+  "homepage": "https://github.com/danjaffray/hosted-fields-test#readme"
+}
