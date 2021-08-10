@@ -4,19 +4,34 @@
     <script src="https://js.globalpay.com/v1/globalpayments.js"></script>
     <script src="globalpayments-3ds.js"></script>
     <script src="authentication.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Hosted Fields - 3DSecure</title>
 </head>
 
 <body>
-    <p>4012001038488884</p>
 
-    <form id="payment-form" action="/api/charge" method="post">
-        <!-- Other input fields to capture relevant data -->
-        <label for="billing_zip">Billing Zip Code</label>
-        <input id="billing_zip" name="billing_zip" value="47150" type="tel" />
-    
-        <!-- Target for the credit card form -->
-        <div id="credit-card"></div>
-    </form>
+    <style>
+        .paragraph {
+        font-family: Helvetica, sans-serif;
+        }
+    </style>
+
+    <div style="width:40%; margin:0 auto;"></div>
+        <h2 class=paragraph>Hosted Fields</h2>  
+        <p class=paragraph> <b>Test card number:</b> 4012 0010 3848 8884 </p>
+        <p class=paragraph> <b>Expiry date:</b> Any future Date </p>
+        <p class=paragraph> <b>CVV:</b> Any 3 digit code </p>
+
+        <form id="payment-form" action="/api/charge" method="post">
+            <!-- Other input fields to capture relevant data -->
+            <label for="billing_zip">Billing Zip Code</label>
+            <input id="billing_zip" name="billing_zip" value="47150" type="tel" />
+        
+            <!-- Target for the credit card form -->
+            <div id="credit-card"></div>
+        </form>
+    </div>
 
 </body>
 </html>
