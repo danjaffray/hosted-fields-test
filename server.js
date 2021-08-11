@@ -1,7 +1,8 @@
 
 // Add a bunch of packages that you need
-const express = require('express');
+const express = require('express'); 
 const fetch = require("node-fetch");
+const qs = require('qs');
 const app = express();
 var sha512 = require('js-sha512');
 const { response } = require('express');
@@ -62,9 +63,10 @@ const getAccessToken = async() => {
     return json
 }
 
-const doCharge = async(paymentToken) => {
+const getAuthenticationResult = async(data) => {
 
-    
+    let id = data.id
+
     console.log("Payment Token", paymentToken)
 
     let accessToken = await getAccessToken()
@@ -78,40 +80,13 @@ const doCharge = async(paymentToken) => {
 
     console.log(accessToken)
 
-    let body = {
-
-        "account_name": accessToken.scope.accounts[0].name,
-        "type": "SALE",
-        "channel": "CNP",
-        "capture_mode": "AUTO",
-        "amount": "1999",
-        "currency": "GBP",
-        "reference": "93459c78-f3f9-427c-84df-ca0584bb55bf",
-        "country": "US",
-        "ip_address": "123.123.123.123",
-        "payment_method": {
-          "id": paymentToken,
-          "name": "James Mason",
-          "entry_mode": "ECOM",
-          "authentication": {
-            "three_ds": {
-              "server_trans_ref": "vJ9NXpFueXsAqeb4iAbJJbe+66s=",
-              "value": "AAACBUGDZYYYIgGFGYNlAAAAAAA=",
-              "eci": "5",
-              "message_version": "1.0.0"
-            }
-          }
-        }
-    }
-
     let options = {
         method:"POST",
-        body: JSON.stringify(body),
         headers:headers
 
     }
 
-    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/transactions`, options);
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/transactions/${id}/result`, options);
     const json = await response.json()
 
     return json
@@ -293,6 +268,70 @@ const initiate3dsecure = async (data) => {
 
 }
 
+const createCharge = async (data) => {
+
+    data.token_id
+
+    data.auth_id
+
+    data.serverTransRef
+    data.authenticationValue 
+    data.eci 
+    data.messageVersion
+
+    let accessToken = await getAccessToken()
+
+    let headers ={
+        "X-GP-Version": gpApiVersion,
+        "Content-Type": "application/json",
+        "Accept" : "application/json",
+        "Authorization" : "Bearer " + accessToken.token
+    }
+
+
+    let body = {
+        "account_name": accessToken.scope.accounts[0].name,
+        "type": "SALE",
+        "channel": "CNP",
+        "capture_mode": "AUTO",
+        "amount": "1999",
+        "currency": "GBP",
+        "reference": "93459c78-f3f9-427c-84df-ca0584bb55bf",
+        "country": "GB",
+        "ip_address": "123.123.123.123",
+            "payment_method": {
+                "id": data.token_id,
+                "name": "James Mason",
+                "entry_mode": "ECOM",
+                "authentication": {
+                    "id": data.auth_id
+                    // "three_ds": {
+                    //     "server_trans_ref":  data.serverTransRef,
+                    //     "value":  data.authenticationValue,
+                    //     "eci":  data.eci,
+                    //     "message_version": data.messageVersion
+                    // }
+            }
+        }
+    }
+
+    let options = {
+        method:"POST",
+        body: JSON.stringify(body),
+        headers:headers
+
+    }
+
+    console.log(body)
+   
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/transactions`, options);
+    const json = await response.json()
+
+    return json
+
+
+}
+
 // Routes for application requests
 app.get('/api/accessToken', async (request, response) => {
 
@@ -417,9 +456,24 @@ try {
     let initiate3dsecureResponse = await initiate3dsecure(initiateAuthenticationData)
     
     console.log(initiate3dsecureResponse)
-    
-    let formattedResponse = await initiateAuthenticationFormatter(initiate3dsecureResponse)
-    response.send(formattedResponse)
+
+    switch(initiate3dsecureResponse.status){
+        case "NOT_AUTHENTICATED":
+        case "FAILED":
+
+            response.send({"error": "Authentication failed"});
+            break;
+
+        case "CHALLENGE_REQUIRED":          
+        let formattedResponse = await initiateAuthenticationFormatter(initiate3dsecureResponse)
+        response.send(formattedResponse)
+        break
+
+        default:
+        formattedResponse = await initiateAuthenticationFormatter(initiate3dsecureResponse)
+        response.send(formattedResponse)
+        break
+    }
     
 } catch (error) {
     response.send(error)
@@ -427,15 +481,38 @@ try {
 
 })
 
-app.post('/api/charge', async (request, response) => {
+app.post('/api/createCharge', async (request, response) => {
     
+    console.log("*********************************** /api/createCharge API REQUEST ");
     const data = request.body
+    console.log(data)
 
     try {
 
-    let charge = await doCharge(data.payment_token)
-    response.send(charge)
+    // Take the payment token and auth ID from the client side and send for auth
+    let charge = await createCharge({
+        "token_id":data.payment_token,
+        "auth_id":data.auth_id}
+        )
+
+    console.log(charge)
+    
+    switch (charge.payment_method.result){
+
+        case "00":
+
+            // Redirect to success page with tranaction response
+            response.redirect("/success.html?" + qs.stringify(charge))
+
+            break;
         
+        default:
+         
+            // Redirect to failure page
+            response.redirect("/error.html?" + qs.stringify(charge))
+            break;
+
+        }
     } 
     catch (error) {
         response.send(error)

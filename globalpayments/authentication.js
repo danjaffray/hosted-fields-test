@@ -1,4 +1,10 @@
 
+document.addEventListener("DOMContentLoaded", async function(){
+    console.log("Starting payment")
+    await startPayment();
+});
+
+
     // use ngrok to tunnel into a publicly accessable website (not needed if hosting yourself)
     const ngrok = "https://c874e34d3672.ngrok.io"
 
@@ -13,6 +19,7 @@
     const startPayment = async() => {
 
         let accessToken = await getAccessToken()
+        console.log(accessToken)
         
     // Configure account
     GlobalPayments.configure({
@@ -23,7 +30,9 @@
     // Create Form
     const cardForm = GlobalPayments.creditCard.form("#credit-card", { style: "gp-default" });
 
-    cardForm.addStylesheet({
+    cardForm.ready(async () => {
+        
+        cardForm.addStylesheet({
             '@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap")': {},
 
             'form#payment-form': {},
@@ -67,6 +76,7 @@
                 }
             }
         });
+    })
     
     cardForm.on("token-success", async (resp) => { // need to make this function async to allow the helper library to use await
 
@@ -95,9 +105,6 @@
                 paymentToken: resp.paymentReference,
             });
 
-
-    // initiate a redirect with VersionCheckData + Token
-    // initiate the below in new page
     console.log("Version Check Data", versionCheckData)
 
             const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
@@ -116,23 +123,29 @@
 
     console.log("Authentication Data", authenticateData)
 
+    // add payment token to form as a hidden input
+    const token = document.createElement("input");
+    token.type = "hidden";
+    token.name = "payment_token";
+    token.value = resp.paymentReference;
+
+    const authentication = document.createElement("input");
+    authentication.type = "hidden";
+    authentication.name = "auth_id";
+    authentication.value = versionCheckData.id;
+
+// Submit data to the integration's backend for processing
+    const form = document.getElementById("payment-form");
+    form.appendChild(token);
+    form.appendChild(authentication);
+    form.submit();
+
         } catch (e) {
         console.error('An error occurred', e.reasons);
         console.log(e)
         return;
     }     
 
-    console.log("Single use Token", resp.paymentReference)
-    // // add payment token to form as a hidden input
-        // const token = document.createElement("input");
-        // token.type = "hidden";
-        // token.name = "payment_token";
-        // token.value = resp.paymentReference;
-    
-    // // Submit data to the integration's backend for processing
-        // const form = document.getElementById("payment-form");
-        // form.appendChild(token);
-        // form.submit();
     });
     
     cardForm.on("token-error", (resp) => {
@@ -140,7 +153,3 @@
     });
 }
 
-document.addEventListener("DOMContentLoaded", async function(){
-    console.log("Starting payment")
-    await startPayment();
-});
