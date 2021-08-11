@@ -13,8 +13,6 @@ app.use(express.urlencoded({
     extended: true
 }));
 
-
-
 app.listen(8080, () =>{
     console.log("Running on port 8080");
 })
@@ -58,7 +56,7 @@ const getAccessToken = async() => {
 
     }
 
-    const response = await fetch("https://apis.sandbox.globalpay.com/ucp/accesstoken", options);
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/accesstoken`, options);
     const json = await response.json()
 
     return json
@@ -82,12 +80,12 @@ const doCharge = async(paymentToken) => {
 
     let body = {
 
-        "account_name": "Transaction_Processing",
+        "account_name": accessToken.scope.accounts[0].name,
         "type": "SALE",
         "channel": "CNP",
         "capture_mode": "AUTO",
         "amount": "1999",
-        "currency": "USD",
+        "currency": "GBP",
         "reference": "93459c78-f3f9-427c-84df-ca0584bb55bf",
         "country": "US",
         "ip_address": "123.123.123.123",
@@ -113,7 +111,7 @@ const doCharge = async(paymentToken) => {
 
     }
 
-    const response = await fetch("https://apis.sandbox.globalpay.com/ucp/transactions", options);
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/transactions`, options);
     const json = await response.json()
 
     return json
@@ -130,15 +128,18 @@ const check3dsVersion = async(data) => {
         "Authorization" : "Bearer " + accessToken.token
     }
 
+    
     let body = {
         
-            "account_name": "Transaction_Processing",
+            "account_name": accessToken.scope.accounts[0].name,
             "channel": "CNP",
-            "currency": "EUR",
+            "currency": "GBP",
             "reference": "My Own Reference",
-            "country": "US",
+            "country": "GB",
             "amount": "1999",
-            "source": "BROWSER",
+            "three_ds":{
+                "source": "BROWSER"
+            },
             "payment_method": {
                 "id": data.paymentToken
             },
@@ -155,7 +156,7 @@ const check3dsVersion = async(data) => {
 
     }
 
-    const response = await fetch("https://apis.sandbox.globalpay.com/ucp/authentications", options);
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/authentications`, options);
     const json = await response.json()
 
     return json
@@ -177,13 +178,15 @@ const initiate3dsecure = async (data) => {
 
 
     let body = {
-        "account_name": "Transaction_Processing",
+        "account_name": accessToken.scope.accounts[0].name,
         "channel": "CNP",
-        "amount": "5",
-        "currency": "EUR",
-        "country": "US",
+        "amount": "1999",
+        "currency": "GBP",
+        "country": "GB",
         "preference": "CHALLENGE_MANDATED",
-        "source": "BROWSER",
+        "three_ds":{
+            "source": "BROWSER"
+        },
         "method_url_completion_status": "YES",
         "payment_method": {
           "id": data.paymentToken
@@ -191,7 +194,7 @@ const initiate3dsecure = async (data) => {
         "order": {
           "time_created_reference": "2019-04-26T10:19:32.552327Z",
           "amount": "1001",
-          "currency": "EUR",
+          "currency": "GBP",
           "reference": "3400dd37-101d-4940-be15-3c963b6109b3",
           "address_match_indicator": "false",
           "shipping_address": {
@@ -280,9 +283,9 @@ const initiate3dsecure = async (data) => {
 
     }
 
-    console.log(`https://apis.sandbox.globalpay.com/ucp/authentications/${id}/initiate`);
-
-    const response = await fetch(`https://apis.sandbox.globalpay.com/ucp/authentications/${id}/initiate`, options);
+    console.log(body)
+   
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/authentications/${id}/initiate`, options);
     const json = await response.json()
 
     return json
@@ -295,11 +298,20 @@ app.get('/api/accessToken', async (request, response) => {
 
     // define a function to get Access Token
     let accessToken = await getAccessToken()
-    response.send(accessToken)
+
+    // pull environment from config file
+    let environment = process.env.GP_API_CLIENTSIDE_ENVIRONMENT
+    console.log(environment)
+
+    // Return object to client side 
+    response.send({
+        "config": accessToken,
+        "environment": environment
+    })
 
 })
 
-app.post('/3ds2/challengeNotificationUrl', async (request, response) => {
+app.all('/3ds2/challengeNotificationUrl', async (request, response) => {
 
     console.log("*********************************** /api/3DSecure/challengeNotificationUrl API REQUEST ");      
     console.log("challengeNotifcationURL", request.body);
@@ -324,13 +336,16 @@ app.post('/3ds2/challengeNotificationUrl', async (request, response) => {
     // Check if the challenge was successful
     if (transStatus == "Y"){
 
-        // send a query string to the challenge URL to notify of successful result
+        // send a query string to the challenge URL to notify of a successful result
+        console.log(stringJson)
         response.redirect("/challengeNotificationUrl.html?challengeSuccessful=true");
     }
+    else{
 
         console.log(stringJson)
         response.redirect("/challengeNotificationUrl.html?challengeSuccessful=false");
     
+    }
     } catch (error) {
 
         console.log(error)
@@ -455,7 +470,7 @@ let initiateAuthenticationFormatter = async (jsonResponse) =>{
     
         "challenge": {
             "encodedChallengeRequest":jsonResponse.three_ds.challenge_value,
-            "requestUrl":jsonResponse.three_ds.redirect_url,
+            "requestUrl":jsonResponse.three_ds.acs_challenge_request_url, // or redirect_url / acs_challenge_request_url
         },
         "challengeMandated": jsonResponse.three_ds.challenge_status,
         "deviceRenderOptions": jsonResponse.three_ds.authentication_source,

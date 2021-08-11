@@ -1,6 +1,6 @@
 
     // use ngrok to tunnel into a publicly accessable website (not needed if hosting yourself)
-    const ngrok = "https://ef0de401d945.ngrok.io"
+    const ngrok = "https://c874e34d3672.ngrok.io"
 
     // Get Access Token
     const getAccessToken = async () => {
@@ -13,12 +13,11 @@
     const startPayment = async() => {
 
         let accessToken = await getAccessToken()
-        console.log(accessToken)
         
     // Configure account
     GlobalPayments.configure({
-        accessToken: accessToken.token,
-        env: "sandbox" // or "production"
+        accessToken: accessToken.config.token,
+        env: accessToken.environment // "sandbox" or "production" 
     });       
     
     // Create Form
