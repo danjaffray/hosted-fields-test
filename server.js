@@ -523,7 +523,8 @@ try {
         case "FAILED":
 
         response.send({
-                "result":initiate3dsecureResponse.status
+                "result":initiate3dsecureResponse.status,
+                "detail": initiate3dsecureResponse
             });
 
         break;
@@ -562,7 +563,10 @@ try {
 
         default:
         
-        response.send(error)
+        response.send({
+                    "result":error,
+                    "detail":initiate3dsecureResponse
+                    })
         break
     }
     

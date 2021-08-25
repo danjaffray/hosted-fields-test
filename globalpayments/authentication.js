@@ -112,34 +112,33 @@ document.addEventListener("DOMContentLoaded", async function(){
 
                 case "1.0.0":
                 
-                console.log("3DSecure 1")
-                //TODO
-
-                break;
+                    console.log("3DSecure 1")
+                    //TODO
+                    break;
 
                 case "2.2.0":
                 case "2.1.0":
                                               
-                const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
-                    merchantContactUrl: 'http://example.com/contact',
-                    challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
-                    challengeWindow: {
-                        windowSize: ChallengeWindowSize.Windowed600x400,
-                        displayMode: 'lightbox',
-                    },
-                    authenticationRequestType: AuthenticationRequestType.PaymentTransaction,
-                    serverTransactionId: versionCheckData.serverTransactionId,
-                    methodUrlComplete: true,
-                    paymentToken: resp.paymentReference,
-                    id: versionCheckData.id
-                });
-    
-                console.log("Authentication Data", authenticateData)
-                break;
+                    const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
+                        merchantContactUrl: 'http://example.com/contact',
+                        challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
+                        challengeWindow: {
+                            windowSize: ChallengeWindowSize.Windowed600x400,
+                            displayMode: 'lightbox',
+                        },
+                        authenticationRequestType: AuthenticationRequestType.PaymentTransaction,
+                        serverTransactionId: versionCheckData.serverTransactionId,
+                        methodUrlComplete: true,
+                        paymentToken: resp.paymentReference,
+                        id: versionCheckData.id
+                    });
+        
+                    console.log("Authentication Data", authenticateData)
+                    break;
 
                 default:
-                console.log("There was an error")
-                break;
+                    console.log("There was an error")
+                    break;
             }
 
             // add payment token to form as a hidden input
