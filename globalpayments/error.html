@@ -1,4 +1,4 @@
-<html>
+<!DOCTYPE html>
   <head>
     <link href="https://fonts.googleapis.com/css?family=Nunito+Sans:400,400i,700,900&display=swap" rel="stylesheet">
   </head>
@@ -38,12 +38,25 @@
  
     </style>
     <body>
+
+      <script>
+          
+        const urlSearchParams = new URLSearchParams(window.location.search);
+        const params = Object.fromEntries(urlSearchParams.entries());
+
+        console.log(params)
+
+
+    </script>
+
       <div class="card">
       <div style="border-radius:200px; height:200px; width:200px; background: #F8FAF5; margin:0 auto;">
         <i class="checkmark">X</i>
+      
       </div>
         <h1>Error</h1> 
         <p>There was a problem;<br/> we'll be in touch shortly!</p>
+        <p id="message">Hello </p>
       </div>
 
       <script>
@@ -54,6 +67,8 @@
             p.innerHTML = key +":" + value;
             document.body.appendChild(p);
                 });
+
+            document.getElementById("message").innerHTML = params.status;
         
         </script>
 

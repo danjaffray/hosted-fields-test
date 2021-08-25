@@ -65,9 +65,9 @@ const getAccessToken = async() => {
 
 const getAuthenticationResult = async(data) => {
 
-    let id = data.id
+    let auth_id = data
 
-    console.log("Payment Token", paymentToken)
+    console.log(data)
 
     let accessToken = await getAccessToken()
 
@@ -78,15 +78,13 @@ const getAuthenticationResult = async(data) => {
         "Authorization" : "Bearer " + accessToken.token
     }
 
-    console.log(accessToken)
-
     let options = {
         method:"POST",
         headers:headers
 
     }
 
-    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/transactions/${id}/result`, options);
+    const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/authentications/${auth_id}/result`, options);
     const json = await response.json()
 
     return json
@@ -257,8 +255,6 @@ const initiate3dsecure = async (data) => {
         headers:headers
 
     }
-
-    console.log(body)
    
     const response = await fetch(`${process.env.GP_API_ENVIRONMENT}/ucp/authentications/${id}/initiate`, options);
     const json = await response.json()
@@ -404,24 +400,72 @@ app.post('/3ds2/check3dsVersion', async (request, response) => {
 
     console.log("*********************************** /api/3DSecure/checkVersion API REQUEST ");
 
-    const data = request.body;
-    console.log(data)
+     const data = request.body;
+    // console.log(data)
     
     try {
-        let checkVersionData = {
+    
+        let checkVersionResponse = await check3dsVersion({
             "paymentToken": data.paymentToken,
             "challenge_return_url" : data.challengeNotificationUrl,
             "three_ds_method_return_url" : data.methodNotificationUrl
+        })
+
+        console.log("/api/3DSecure/checkVersion API RESPONSE", checkVersionResponse);
+        
+        // https://github.com/globalpayments/globalpayments-js/blob/20cc8a775af8dbcaf7b36489f94626632ba919f1/packages/globalpayments-3ds/src/interfaces.ts#L44
+
+        switch(checkVersionResponse.three_ds.enrolled_status){
+
+
+            case "NOT_ENROLLED":
+                response.send({
+
+                    "enrolled":checkVersionResponse.three_ds.enrolled_status,
+                    "methodData":checkVersionResponse.three_ds.method_data.encoded_method_data,
+                    "methodUrl":checkVersionResponse.three_ds.method_url,
+                    "serverTransactionId":checkVersionResponse.three_ds.server_trans_ref,
+                    "three_ds":{
+                        "eci":checkVersionResponse.three_ds.eci,
+                        "liability_shift":checkVersionResponse.three_ds.liability_shift
+                    },
+                    "versions":{
+                        "accessControlServer":{
+                            "end": checkVersionResponse.three_ds.acs_protocol_version_end,
+                            "start" : checkVersionResponse.three_ds.acs_protocol_version_start
+                        },
+                        "directoryServer":{
+                            "end": checkVersionResponse.three_ds.ds_protocol_version_end,
+                            "start" : checkVersionResponse.three_ds.ds_protocol_version_start
+                        }
+                    },
+                    "id":checkVersionResponse.id
+                });
+                break;
+
+            case "ENROLLED":
+                response.send({
+
+                    "enrolled":checkVersionResponse.three_ds.enrolled_status,
+                    "methodData":checkVersionResponse.three_ds.method_data.encoded_method_data,
+                    "methodUrl":checkVersionResponse.three_ds.method_url,
+                    "serverTransactionId":checkVersionResponse.three_ds.server_trans_ref,
+                    "versions":{
+                        "accessControlServer":{
+                            "end": checkVersionResponse.three_ds.acs_protocol_version_end,
+                            "start" : checkVersionResponse.three_ds.acs_protocol_version_start
+                        },
+                        "directoryServer":{
+                            "end": checkVersionResponse.three_ds.ds_protocol_version_end,
+                            "start" : checkVersionResponse.three_ds.ds_protocol_version_start
+                        }
+                    },
+                    "id":checkVersionResponse.id
+                });
+                break;
         }
-    
-        let checkVersionResponse = await check3dsVersion(checkVersionData)
-    
-        console.log("/api/3DSecure/checkVersion API RESPONSE");
-    
-        console.log(checkVersionResponse);
-    
-        let formattedResponse = await checkVersionFormatter(checkVersionResponse)
-        response.send(formattedResponse);
+
+
         
     }
     catch (error) {
@@ -438,7 +482,8 @@ const data = request.body
 console.log("Data", data)
 
 try {
-    let initiateAuthenticationData = {
+   
+    let initiate3dsecureResponse = await initiate3dsecure({
 
         "authenticationRequestType":data.authenticationRequestType,
         "authenticationSource":data.authenticationSource,
@@ -451,27 +496,73 @@ try {
         "serverTransactionId":data.serverTransactionId,
         "id":data.id,
         "paymentToken":data.paymentToken
-    }
-    
-    let initiate3dsecureResponse = await initiate3dsecure(initiateAuthenticationData)
+    })
     
     console.log(initiate3dsecureResponse)
 
     switch(initiate3dsecureResponse.status){
+
+        // Successful
+        case "SUCCESS_AUTHENTICATED":
+        case "SUCCESS_ATTEMPT_MADE":
+
+        response.send({
+            "result":initiate3dsecureResponse.status,
+            "mpi": {
+                "authenticationValue":initiate3dsecureResponse.three_ds.authentication_value,
+                "eci":initiate3dsecureResponse.three_ds.eci,
+            },
+            "serverTransactionId": initiate3dsecureResponse.three_ds.server_trans_ref,
+            "status": initiate3dsecureResponse.three_ds.status,
+        });
+
+        break;
+
+        // Unsuccessful
         case "NOT_AUTHENTICATED":
         case "FAILED":
 
-            response.send({"error": "Authentication failed"});
+        response.send({
+                "result":initiate3dsecureResponse.status
+            });
+
+        break;
+
+        // Challenge required
+        case "CHALLENGE_REQUIRED":          
+            // https://github.com/globalpayments/globalpayments-js/blob/20cc8a775af8dbcaf7b36489f94626632ba919f1/packages/globalpayments-3ds/src/interfaces.ts#L99
+            response.send({
+                "acsTransactionId": initiate3dsecureResponse.three_ds.acs_trans_ref,
+                "authenticationSource": initiate3dsecureResponse.three_ds.authentication_source,
+                "authenticationRequestType": initiate3dsecureResponse.three_ds.message_category,
+                "cardholderResponseInfo": initiate3dsecureResponse.three_ds.cardholder_response_info,
+            
+                "challenge": {
+                    "encodedChallengeRequest":initiate3dsecureResponse.three_ds.challenge_value,
+                    "requestUrl":initiate3dsecureResponse.three_ds.acs_challenge_request_url, 
+                },
+                "challengeMandated": initiate3dsecureResponse.three_ds.challenge_status,
+                "deviceRenderOptions": initiate3dsecureResponse.three_ds.authentication_source,
+                "dsTransactionId": initiate3dsecureResponse.three_ds.ds_trans_ref,
+                "messageCategory": initiate3dsecureResponse.three_ds.message_category,
+                "messageExtension": "",
+                "messageVersion": {
+                    "end":initiate3dsecureResponse.three_ds.message_version,
+                    "start":initiate3dsecureResponse.three_ds.message_version,
+                },            
+                "mpi": {
+                    "authenticationValue":initiate3dsecureResponse.three_ds.authentication_value,
+                    "eci":initiate3dsecureResponse.three_ds.eci,
+                },
+                "serverTransactionId": initiate3dsecureResponse.three_ds.server_trans_ref,
+                "status": initiate3dsecureResponse.three_ds.status,
+                "statusReason": initiate3dsecureResponse.three_ds.status_reason,
+                })
             break;
 
-        case "CHALLENGE_REQUIRED":          
-        let formattedResponse = await initiateAuthenticationFormatter(initiate3dsecureResponse)
-        response.send(formattedResponse)
-        break
-
         default:
-        formattedResponse = await initiateAuthenticationFormatter(initiate3dsecureResponse)
-        response.send(formattedResponse)
+        
+        response.send(error)
         break
     }
     
@@ -487,35 +578,43 @@ app.post('/api/createCharge', async (request, response) => {
     const data = request.body
     console.log(data)
 
+    let authenticationData = await getAuthenticationResult(data.auth_id)
+
+    console.log(authenticationData)
     try {
 
-    // Take the payment token and auth ID from the client side and send for auth
-    let charge = await createCharge({
-        "token_id":data.payment_token,
-        "auth_id":data.auth_id}
-        )
-
-    console.log(charge)
-    
-    switch (charge.payment_method.result){
-
-        case "00":
-
-            // Redirect to success page with tranaction response
-            response.redirect("/success.html?" + qs.stringify(charge))
-
+    switch(authenticationData.three_ds.liability_shift){
+        case "NO":
+            response.redirect("/error.html?" + qs.stringify(authenticationData))
             break;
-        
+
+        case "YES":
+             // Take the payment token and auth ID from the client side and send for auth 
+            let charge = await createCharge({
+                "token_id":data.payment_token,
+                "auth_id":data.auth_id
+                })
+
+            switch (charge.payment_method.result){
+                case "00":
+                    // Redirect to success page with tranaction response
+                    response.redirect("/success.html?" + qs.stringify(charge))           
+                    break;
+                    
+                default:
+                    // Redirect to failure page
+                    response.redirect("/error.html?" + qs.stringify(charge))
+                    break;
+                }
+            break;
+
         default:
-         
-            // Redirect to failure page
-            response.redirect("/error.html?" + qs.stringify(charge))
-            break;
+            response.redirect("/error.html?" + qs.stringify(authenticationData))
+        } 
+    }
 
-        }
-    } 
     catch (error) {
-        response.send(error)
+        response.redirect("/error.html?" + qs.stringify(authenticationData))
     }    
 })
 
@@ -532,8 +631,28 @@ let checkVersionFormatter = async (jsonResponse) =>{
             "accessControlServer":jsonResponse.three_ds.acs_protocol_version_start,
             "directoryServer":jsonResponse.three_ds.ds_protocol_version_start
         },
-        "id":jsonResponse.id
-    }
+        "id":jsonResponse.id,
+        "three_ds":{
+            "message_version": jsonResponse.three_ds.message_version,
+            "ds_protocol_version_start":jsonResponse.three_ds.ds_protocol_version_start,
+            "ds_protocol_version_end":jsonResponse.three_ds.ds_protocol_version_end,
+            "acs_protocol_version_start": jsonResponse.three_ds.acs_protocol_version_start,
+            "acs_protocol_version_end": jsonResponse.three_ds.acs_protocol_version_end,
+            "enrolled_status:": jsonResponse.three_ds.enrolled_status,
+            "eci": jsonResponse.three_ds.eci,
+            "liability_shift": jsonResponse.three_ds.liability_shift,
+            "challenge_model": jsonResponse.three_ds.challenge_model,
+            "challenge_status": jsonResponse.three_ds.challenge_status,
+            "session_data_field_name": jsonResponse.three_ds.session_data_field_name,
+            "message_type": jsonResponse.three_ds.message_type,
+            "challenge_value": jsonResponse.three_ds.challenge_value,
+            "redirect_url": jsonResponse.three_ds.redirect_url,
+            "acs_challenge_request_url": jsonResponse.three_ds.acs_challenge_request_url
+            },
+        "notifications":{
+            "challenge_return_url": jsonResponse.notifications.challenge_return_url
+            }
+        }
     return response;
 }
 

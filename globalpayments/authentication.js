@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", async function(){
 
 
     // use ngrok to tunnel into a publicly accessable website (not needed if hosting yourself)
-    const ngrok = "https://c874e34d3672.ngrok.io"
+    const ngrok = "https://ad3eada0c176.ngrok.io"
 
     // Get Access Token
     const getAccessToken = async () => {
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async function(){
     const cardForm = GlobalPayments.creditCard.form("#credit-card", { style: "gp-default" });
 
     cardForm.ready(async () => {
-        
+
         cardForm.addStylesheet({
             '@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap")': {},
 
@@ -95,8 +95,8 @@ document.addEventListener("DOMContentLoaded", async function(){
             ChallengeWindowSize,
         } = GlobalPayments.ThreeDSecure;
 
-    console.log("Method Notifcation URL", ngrok + '/3ds2/methodNotificationUrl')
-    console.log("Challenge Notifcation URL",ngrok + '/3ds2/challengeNotificationUrl')
+    // console.log("Method Notifcation URL", ngrok + '/3ds2/methodNotificationUrl')
+    // console.log("Challenge Notifcation URL",ngrok + '/3ds2/challengeNotificationUrl')
 
         try {
             const versionCheckData = await checkVersion('/3ds2/check3dsVersion', {
@@ -105,40 +105,59 @@ document.addEventListener("DOMContentLoaded", async function(){
                 paymentToken: resp.paymentReference,
             });
 
-    console.log("Version Check Data", versionCheckData)
+            console.log("Version Check Data", versionCheckData)
 
-            const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
-                merchantContactUrl: 'http://example.com/contact',
-                challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
-                challengeWindow: {
-                    windowSize: ChallengeWindowSize.Windowed600x400,
-                    displayMode: 'lightbox',
-                },
-                authenticationRequestType: AuthenticationRequestType.PaymentTransaction,
-                serverTransactionId: versionCheckData.serverTransactionId,
-                methodUrlComplete: true,
-                paymentToken: resp.paymentReference,
-                id: versionCheckData.id
-            });
+            console.log("Enrolled in 3DS?: " + versionCheckData.enrolled)
+            switch(versionCheckData.enrolled){
 
-    console.log("Authentication Data", authenticateData)
+                case "1.0.0":
+                
+                console.log("3DSecure 1")
+                //TODO
 
-    // add payment token to form as a hidden input
-    const token = document.createElement("input");
-    token.type = "hidden";
-    token.name = "payment_token";
-    token.value = resp.paymentReference;
+                break;
 
-    const authentication = document.createElement("input");
-    authentication.type = "hidden";
-    authentication.name = "auth_id";
-    authentication.value = versionCheckData.id;
+                case "2.2.0":
+                case "2.1.0":
+                                              
+                const authenticateData = await initiateAuthentication('/3ds2/initiateAuthentication', {
+                    merchantContactUrl: 'http://example.com/contact',
+                    challengeNotificationUrl: ngrok + '/3ds2/challengeNotificationUrl',
+                    challengeWindow: {
+                        windowSize: ChallengeWindowSize.Windowed600x400,
+                        displayMode: 'lightbox',
+                    },
+                    authenticationRequestType: AuthenticationRequestType.PaymentTransaction,
+                    serverTransactionId: versionCheckData.serverTransactionId,
+                    methodUrlComplete: true,
+                    paymentToken: resp.paymentReference,
+                    id: versionCheckData.id
+                });
+    
+                console.log("Authentication Data", authenticateData)
+                break;
 
-// Submit data to the integration's backend for processing
-    const form = document.getElementById("payment-form");
-    form.appendChild(token);
-    form.appendChild(authentication);
-    form.submit();
+                default:
+                console.log("There was an error")
+                break;
+            }
+
+            // add payment token to form as a hidden input
+            const token = document.createElement("input");
+            token.type = "hidden";
+            token.name = "payment_token";
+            token.value = resp.paymentReference;
+
+            const authentication = document.createElement("input");
+            authentication.type = "hidden";
+            authentication.name = "auth_id";
+            authentication.value = versionCheckData.id;
+
+            // Submit data to the integration's backend for processing
+            const form = document.getElementById("payment-form");
+            form.appendChild(token);
+            form.appendChild(authentication);
+            form.submit();
 
         } catch (e) {
         console.error('An error occurred', e.reasons);
